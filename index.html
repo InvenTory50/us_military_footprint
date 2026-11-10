@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Global U.S. Military Footprint</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0b0d0a;
+    --panel: #12150f;
+    --panel-2: #171b13;
+    --line: #2a2f22;
+    --ink: #e7e6da;
+    --ink-dim: #9a9c8c;
+    --amber: #c9a227;
+    --amber-dim: #8a7220;
+    --olive: #6b7a4a;
+    --red: #a3402f;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:var(--bg); color:var(--ink);
+    font-family:'IBM Plex Mono', monospace;
+    overflow:hidden;
+  }
+  #app{ display:flex; height:100vh; width:100vw; }
+
+  /* ---------- Sidebar ---------- */
+  #sidebar{
+    width:340px; min-width:340px; height:100%;
+    background:var(--panel);
+    border-right:1px solid var(--line);
+    display:flex; flex-direction:column;
+    z-index:10;
+  }
+  #sidebar-scroll{
+    overflow-y:auto; flex:1; padding:0 0 20px 0;
+  }
+  #sidebar-scroll::-webkit-scrollbar{ width:8px; }
+  #sidebar-scroll::-webkit-scrollbar-thumb{ background:var(--line); border-radius:4px; }
+
+  header{
+    padding:22px 20px 16px 20px;
+    border-bottom:1px solid var(--line);
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--amber); margin:0 0 8px 0;
+  }
+  h1{
+    font-family:'Oswald', sans-serif;
+    font-weight:600; font-size:22px; line-height:1.15;
+    margin:0 0 10px 0; color:var(--ink);
+    letter-spacing:.01em;
+  }
+  .subhead{
+    font-size:11.5px; color:var(--ink-dim); line-height:1.5; margin:0;
+  }
+  .stat-row{
+    display:flex; gap:14px; margin-top:14px;
+  }
+  .stat{ flex:1; }
+  .stat .num{
+    font-family:'Oswald', sans-serif; font-size:26px; font-weight:600; color:var(--amber);
+    line-height:1;
+  }
+  .stat .lbl{
+    font-size:9.5px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.1em; margin-top:3px;
+  }
+
+  .section-title{
+    font-family:'Oswald', sans-serif;
+    font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--ink-dim); padding:16px 20px 8px 20px; margin:0;
+  }
+
+  .region-item{
+    display:flex; align-items:center; gap:10px;
+    padding:8px 20px; cursor:pointer;
+    border-left:3px solid transparent;
+    transition:background .12s ease;
+  }
+  .region-item:hover{ background:var(--panel-2); }
+  .region-item.active{ border-left-color:var(--amber); background:var(--panel-2); }
+  .swatch{
+    width:11px; height:11px; border-radius:50%; flex-shrink:0;
+    box-shadow:0 0 0 2px rgba(0,0,0,.4) inset;
+  }
+  .region-name{ font-size:12.5px; flex:1; color:var(--ink); }
+  .region-count{ font-size:11px; color:var(--ink-dim); }
+  .region-item input{ display:none; }
+  .region-item.inactive .region-name, .region-item.inactive .region-count{ color:#54574a; }
+  .region-item.inactive .swatch{ opacity:.25; }
+
+  .controls-row{
+    display:flex; gap:8px; padding:6px 20px 4px 20px;
+  }
+  .mini-btn{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--ink-dim); background:transparent; border:1px solid var(--line);
+    padding:5px 10px; cursor:pointer; border-radius:2px;
+  }
+  .mini-btn:hover{ border-color:var(--amber-dim); color:var(--amber); }
+
+  #detail{
+    border-top:1px solid var(--line);
+    padding:16px 20px; min-height:120px;
+  }
+  #detail .placeholder{ color:var(--ink-dim); font-size:11.5px; line-height:1.6; }
+  #detail .name{
+    font-family:'Oswald', sans-serif; font-weight:600; font-size:16px; color:var(--amber);
+    margin-bottom:6px;
+  }
+  #detail .region-tag{
+    display:inline-block; font-size:10px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--ink-dim); border:1px solid var(--line); padding:2px 7px; border-radius:2px;
+    margin-bottom:10px;
+  }
+  #detail .note{ font-size:12px; line-height:1.6; color:var(--ink); }
+
+  footer{
+    padding:12px 20px; border-top:1px solid var(--line);
+    font-size:9.5px; color:#54574a; line-height:1.5;
+  }
+
+  /* ---------- Map ---------- */
+  #map{ flex:1; height:100%; background:#05070a; }
+  .leaflet-popup-content-wrapper{
+    background:var(--panel); color:var(--ink);
+    border:1px solid var(--line); border-radius:3px;
+    font-family:'IBM Plex Mono', monospace;
+  }
+  .leaflet-popup-tip{ background:var(--panel); }
+  .popup-name{ font-family:'Oswald', sans-serif; font-weight:600; font-size:14px; color:var(--amber); margin-bottom:4px; }
+  .popup-note{ font-size:11.5px; color:var(--ink-dim); line-height:1.4; }
+  .leaflet-container{ font-family:'IBM Plex Mono', monospace; }
+
+  .base-marker{
+    border-radius:50%;
+    box-shadow:0 0 0 2px rgba(0,0,0,.55), 0 0 8px rgba(0,0,0,.5);
+  }
+
+  @media (max-width: 760px){
+    #sidebar{ width:100%; position:absolute; height:44%; bottom:0; top:auto; border-right:none; border-top:1px solid var(--line); }
+    #map{ height:56%; }
+    #app{ flex-direction:column; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <div id="sidebar-scroll">
+      <header>
+        <p class="eyebrow">Master Overview &mdash; Offline Reference</p>
+        <h1>Global U.S. Military Footprint</h1>
+        <p class="subhead">Major installations and access sites across nine regional theatres, current as of Aug 2026.</p>
+        <div class="stat-row">
+          <div class="stat"><div class="num" id="stat-total">0</div><div class="lbl">Sites Mapped</div></div>
+          <div class="stat"><div class="num" id="stat-regions">9</div><div class="lbl">Theatres</div></div>
+          <div class="stat"><div class="num" id="stat-visible">0</div><div class="lbl">Visible</div></div>
+        </div>
+      </header>
+
+      <p class="section-title">Filter by Theatre</p>
+      <div class="controls-row">
+        <button class="mini-btn" id="btn-all">Show all</button>
+        <button class="mini-btn" id="btn-none">Hide all</button>
+      </div>
+      <div id="region-list"></div>
+
+      <div id="detail">
+        <p class="placeholder">Click any marker on the map to see details about that installation.</p>
+      </div>
+    </div>
+    <footer>
+      Compiled from open-source reporting and Google Places data. Not an official DoD source &mdash; site counts and status are illustrative, not exhaustive. Map tiles load from CARTO/OSM and require an internet connection; site data itself is embedded in this file.
+    </footer>
+  </div>
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ---------------- DATA ----------------
+const REGIONS = {
+  "North America": { color: "#c9a227" },
+  "Europe":        { color: "#6b9bd1" },
+  "Asia":          { color: "#d16b8f" },
+  "Middle East":   { color: "#d18b3d" },
+  "Africa":        { color: "#7fb069" },
+  "Oceania":       { color: "#4fc3c9" },
+  "Southeast Asia":{ color: "#b48ee0" },
+  "South America": { color: "#e0574a" },
+  "Caribbean":     { color: "#e0c34a" },
+  "Central America": { color: "#8fd14a" }
+};
+
+const SITES = [
+  // North America
+  {name:"Fort Liberty (Fort Bragg), NC", region:"North America", lat:35.1507742, lng:-78.9835899, note:"Army — largest U.S. base by population; XVIII Airborne Corps & Special Operations Forces."},
+  {name:"Fort Campbell, KY", region:"North America", lat:36.6315269, lng:-87.4404067, note:"Army — home of the 101st Airborne Division."},
+  {name:"Fort Bliss, TX", region:"North America", lat:31.7954425, lng:-106.4057941, note:"Army — one of the largest installations by land area."},
+  {name:"Fort Benning, GA", region:"North America", lat:32.3516427, lng:-84.9689742, note:"Army — Maneuver Center of Excellence, Infantry & Armor Schools."},
+  {name:"Joint Base San Antonio, TX", region:"North America", lat:29.4569597, lng:-98.4458421, note:"Army/Air Force — major medical training hub."},
+  {name:"Fort Meade, MD", region:"North America", lat:39.1042635, lng:-76.7342399, note:"Army — home of NSA and U.S. Cyber Command."},
+  {name:"Joint Base Lewis-McChord, WA", region:"North America", lat:47.133159, lng:-122.4940059, note:"Army/Air Force — I Corps mobilization center, Pacific gateway."},
+  {name:"Naval Station Norfolk, VA", region:"North America", lat:36.943454, lng:-76.3194601, note:"Navy — world's largest naval station, Atlantic Fleet hub."},
+  {name:"Naval Base San Diego, CA", region:"North America", lat:32.6858247, lng:-117.1254215, note:"Navy — principal Pacific Fleet surface ship homeport."},
+  {name:"Camp Pendleton, CA", region:"North America", lat:33.2145465, lng:-117.3871529, note:"Marine Corps — major West Coast base."},
+  {name:"Marine Corps Base Quantico, VA", region:"North America", lat:38.5210415, lng:-77.3564743, note:"Marine Corps — officer training and FBI Academy."},
+  {name:"Camp Lejeune, NC", region:"North America", lat:34.7229368, lng:-77.3581525, note:"Marine Corps — major East Coast expeditionary base."},
+  {name:"Eglin Air Force Base, FL", region:"North America", lat:30.4635583, lng:-86.5533382, note:"Air Force — largest USAF base by area, weapons testing."},
+  {name:"Wright-Patterson AFB, OH", region:"North America", lat:39.8103678, lng:-84.0320547, note:"Air Force — Air Force Materiel Command HQ."},
+  {name:"Nellis Air Force Base, NV", region:"North America", lat:36.2354122, lng:-115.0342369, note:"Air Force — Red Flag combat pilot training exercises."},
+  {name:"Edwards Air Force Base, CA", region:"North America", lat:34.9240314, lng:-117.8912085, note:"Air Force — flight test center, former Space Shuttle landing site."},
+  {name:"Whiteman Air Force Base, MO", region:"North America", lat:38.7302968, lng:-93.5479581, note:"Air Force — home of the B-2 stealth bomber fleet."},
+  {name:"Peterson Space Force Base, CO", region:"North America", lat:38.8256561, lng:-104.6995991, note:"Space Force — Space Operations Command HQ, near NORAD."},
+  {name:"Joint Base Pearl Harbor-Hickam, HI", region:"North America", lat:21.3383018, lng:-157.958004, note:"Navy/Air Force — Pacific Fleet HQ."},
+  {name:"Joint Base Elmendorf-Richardson, AK", region:"North America", lat:61.2546734, lng:-149.6932134, note:"Air Force/Army — Arctic strategic hub."},
+
+  // Europe
+  {name:"Ramstein Air Base, Germany", region:"Europe", lat:49.4398562, lng:7.5964366, note:"Air Force — largest U.S. air base in Europe, HQ of USAFE and NATO Allied Air Command."},
+  {name:"Spangdahlem Air Base, Germany", region:"Europe", lat:49.9940121, lng:6.6988453, note:"Air Force — fighter wing base near the Belgian/Luxembourg border."},
+  {name:"Wiesbaden, Germany", region:"Europe", lat:50.0700999, lng:8.2730873, note:"Army — headquarters of U.S. Army Europe and Africa."},
+  {name:"Stuttgart, Germany", region:"Europe", lat:48.6877783, lng:9.0351207, note:"Army — home to EUCOM and AFRICOM."},
+  {name:"Grafenwöhr (Tower Barracks), Germany", region:"Europe", lat:49.7133842, lng:11.9059604, note:"Army — major training area, U.S. Army Garrison Bavaria."},
+  {name:"Naval Station Rota, Spain", region:"Europe", lat:36.6206791, lng:-6.3012251, note:"Navy — key Atlantic/Mediterranean gateway, jointly run with Spain."},
+  {name:"RAF Lakenheath, UK", region:"Europe", lat:52.38994, lng:0.537442, note:"Air Force — largest USAF-operated base in the UK, F-15/F-35 wing."},
+  {name:"RAF Mildenhall, UK", region:"Europe", lat:52.3626233, lng:0.504206, note:"Air Force — aerial refueling and special operations support."},
+  {name:"Aviano Air Base, Italy", region:"Europe", lat:46.0359584, lng:12.6144786, note:"Air Force — forward fighter wing base near the Alps."},
+  {name:"Naval Support Activity Naples, Italy", region:"Europe", lat:40.9898002, lng:14.2481884, note:"Navy — HQ of U.S. Naval Forces Europe-Africa."},
+
+  // Asia
+  {name:"Yokota Air Base, Japan", region:"Asia", lat:35.7430797, lng:139.3397998, note:"Air Force — headquarters of U.S. Forces Japan."},
+  {name:"Kadena Air Base, Okinawa, Japan", region:"Asia", lat:26.359046, lng:127.7723, note:"Air Force — largest and busiest U.S. air base in the Pacific."},
+  {name:"Misawa Air Base, Japan", region:"Asia", lat:40.6989231, lng:141.3745702, note:"Air Force/Navy — joint base with Japan Air Self-Defense Force."},
+  {name:"Yokosuka Naval Base, Japan", region:"Asia", lat:35.2948528, lng:139.6543404, note:"Navy — forward-deployed homeport for the U.S. 7th Fleet."},
+  {name:"MCAS Iwakuni, Japan", region:"Asia", lat:34.1519534, lng:132.232824, note:"Marine Corps/Navy — major West Pacific air station."},
+  {name:"Camp Zama, Japan", region:"Asia", lat:35.4921051, lng:139.3971464, note:"Army — headquarters of U.S. Army Japan."},
+  {name:"Camp Humphreys, South Korea", region:"Asia", lat:36.9677518, lng:127.0033693, note:"Army — largest U.S. overseas military installation in the world."},
+  {name:"Osan Air Base, South Korea", region:"Asia", lat:37.0906, lng:127.0294, note:"Air Force — headquarters of U.S. 7th Air Force."},
+  {name:"Kunsan Air Base, South Korea", region:"Asia", lat:35.9039, lng:126.6158, note:"Air Force — forward fighter wing base on Korea's west coast."},
+
+  // Middle East
+  {name:"Naval Support Activity Bahrain", region:"Middle East", lat:26.2078687, lng:50.615508, note:"Navy — headquarters of U.S. 5th Fleet and Naval Forces Central Command."},
+  {name:"Al Udeid Air Base, Qatar", region:"Middle East", lat:25.1173, lng:51.316, note:"Air Force — largest U.S. base in the Middle East; forward HQ of CENTCOM, ~10,000 troops."},
+  {name:"Camp Arifjan, Kuwait", region:"Middle East", lat:28.8729852, lng:48.1674528, note:"Army — forward HQ of U.S. Army Central; ~13,000 personnel."},
+  {name:"Ali Al Salem Air Base, Kuwait", region:"Middle East", lat:29.348888, lng:47.5412881, note:"Air Force — primary airlift hub into the region, \"The Rock\"."},
+  {name:"Al Dhafra Air Base, UAE", region:"Middle East", lat:24.2482, lng:54.5477, note:"Air Force — fighters, surveillance aircraft, and tankers near Abu Dhabi."},
+  {name:"Muwaffaq Salti Air Base, Jordan", region:"Middle East", lat:31.845976, lng:36.796852, note:"Air Force — home of the 332nd Expeditionary Wing."},
+  {name:"Ain al-Asad Airbase, Iraq", region:"Middle East", lat:33.8, lng:42.4166667, note:"Army/Air Force — western Anbar; U.S. presence drawing down through 2026."},
+  {name:"Incirlik Air Base, Türkiye", region:"Middle East", lat:36.994769, lng:35.4367109, note:"Air Force — shared NATO installation, regional air ops staging."},
+
+  // Africa
+  {name:"Camp Lemonnier, Djibouti", region:"Africa", lat:11.5406725, lng:43.1583668, note:"Navy — only major enduring U.S. base in Africa; HQ of CJTF-Horn of Africa, ~4,000 personnel."},
+  {name:"Chabelley Airfield, Djibouti", region:"Africa", lat:11.4903253, lng:43.0759143, note:"Air Force — drone and surveillance overflow site near Camp Lemonnier."},
+  {name:"Camp Simba (Manda Bay), Kenya", region:"Africa", lat:-2.25, lng:40.9167, note:"Cooperative security location — counter-terrorism site; runway expansion underway in 2026."},
+
+  // Oceania
+  {name:"Andersen Air Force Base, Guam", region:"Oceania", lat:13.5736997, lng:144.9319146, note:"Air Force — key power-projection hub for bombers and refuelers."},
+  {name:"Naval Base Guam", region:"Oceania", lat:13.4151423, lng:144.67332, note:"Navy — submarine squadron homeport at Apra Harbor."},
+  {name:"Camp Blaz, Guam", region:"Oceania", lat:13.5863037, lng:144.8555691, note:"Marine Corps — newest Marine base worldwide (2020), receiving units from Okinawa."},
+
+  // Southeast Asia
+  {name:"Basa Air Base, Philippines", region:"Southeast Asia", lat:14.985688, lng:120.4962417, note:"EDCA site — rotational U.S. access near Luzon."},
+  {name:"Antonio Bautista Air Base, Palawan, Philippines", region:"Southeast Asia", lat:9.7431679, lng:118.7587898, note:"EDCA site — close to the South China Sea/Spratly Islands flashpoint."},
+  {name:"Fort Magsaysay, Philippines", region:"Southeast Asia", lat:15.4307125, lng:121.0853594, note:"EDCA site — major Philippine Army training ground for joint exercises."},
+  {name:"Lumbia Airport, Philippines", region:"Southeast Asia", lat:8.4059312, lng:124.611142, note:"EDCA site — Mindanao access point."},
+  {name:"Benito Ebuen Air Base, Cebu, Philippines", region:"Southeast Asia", lat:10.310857, lng:123.965332, note:"EDCA site — central Philippines access point."},
+  {name:"Changi Naval Base, Singapore", region:"Southeast Asia", lat:1.3180611, lng:104.0165745, note:"Navy logistics facility supporting 7th Fleet visits — not a sovereign U.S. base."},
+  {name:"U-Tapao Airfield, Thailand", region:"Southeast Asia", lat:12.6759845, lng:100.9980961, note:"Access agreement — Vietnam-era airfield, used for joint exercises."},
+
+  // South America
+  {name:"Manta (Eloy Alfaro Airport), Ecuador", region:"South America", lat:-0.9533834, lng:-80.6838714, note:"Reactivating 2025–2026 — hosted a U.S. FOL until banned in 2009; back under discussion."},
+  {name:"Palanquero Air Base, Colombia", region:"South America", lat:5.4761369, lng:-74.6569207, note:"Cooperative security location under bilateral defense agreements."},
+  {name:"Tolemaida Air Base, Colombia", region:"South America", lat:4.2169209, lng:-74.6347425, note:"Cooperative security location — major joint training site."},
+  {name:"CACOM 3 (Malambo), Colombia", region:"South America", lat:10.8797013, lng:-74.7819819, note:"Cooperative security location — covers the Caribbean coast near Barranquilla."},
+
+  // Caribbean
+  {name:"Naval Station Guantanamo Bay, Cuba", region:"Caribbean", lat:19.9147787, lng:-75.1497793, note:"Navy — sovereign U.S. base on foreign soil under a permanent lease since 1903."},
+  {name:"Roosevelt Roads, Ceiba, Puerto Rico", region:"Caribbean", lat:18.237248, lng:-65.6480292, note:"Navy — deactivated 2004, reopened 2025 amid the Caribbean buildup."},
+  {name:"Muniz Air National Guard Base, Puerto Rico", region:"Caribbean", lat:18.4391288, lng:-65.9943879, note:"Air National Guard — supports counter-narcotics air operations."},
+
+  // Central America
+  {name:"Soto Cano Air Base, Honduras", region:"Central America", lat:14.3825293, lng:-87.6147338, note:"Air Force/Army — Joint Task Force-Bravo, the region's only enduring installation."},
+  {name:"Comalapa, El Salvador", region:"Central America", lat:13.4449927, lng:-89.0570976, note:"Cooperative security location — counter-narcotics surveillance flights."},
+  {name:"Base Aeronaval Cristóbal Colón (former Fort Sherman), Panama", region:"Central America", lat:9.35, lng:-79.95, note:"Reactivated 2025–2026 — jungle warfare training revived after 25 years."}
+];
+
+// ---------------- MAP SETUP ----------------
+const map = L.map('map', { worldCopyJump:true, zoomControl:false }).setView([20, 15], 2.3);
+L.control.zoom({ position:'bottomright' }).addTo(map);
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+  maxZoom: 18,
+  subdomains: 'abcd'
+}).addTo(map);
+
+const activeRegions = new Set(Object.keys(REGIONS));
+const markerRefs = [];
+
+function makeIcon(color){
+  return L.divIcon({
+    className:'',
+    html:`<div class="base-marker" style="width:12px;height:12px;background:${color};"></div>`,
+    iconSize:[12,12],
+    iconAnchor:[6,6]
+  });
+}
+
+SITES.forEach(site => {
+  const color = REGIONS[site.region].color;
+  const marker = L.marker([site.lat, site.lng], { icon: makeIcon(color) });
+  marker.bindPopup(`<div class="popup-name">${site.name}</div><div class="popup-note">${site.note}</div>`);
+  marker.on('click', () => showDetail(site));
+  marker.siteRegion = site.region;
+  markerRefs.push(marker);
+});
+
+function refreshMap(){
+  markerRefs.forEach(m => {
+    if (activeRegions.has(m.siteRegion)) {
+      if (!map.hasLayer(m)) m.addTo(map);
+    } else {
+      if (map.hasLayer(m)) map.removeLayer(m);
+    }
+  });
+  document.getElementById('stat-visible').textContent = markerRefs.filter(m => activeRegions.has(m.siteRegion)).length;
+}
+
+function showDetail(site){
+  document.getElementById('detail').innerHTML = `
+    <div class="name">${site.name}</div>
+    <div class="region-tag">${site.region}</div>
+    <div class="note">${site.note}</div>
+  `;
+}
+
+// ---------------- SIDEBAR ----------------
+const regionList = document.getElementById('region-list');
+Object.keys(REGIONS).forEach(region => {
+  const count = SITES.filter(s => s.region === region).length;
+  const item = document.createElement('div');
+  item.className = 'region-item active';
+  item.dataset.region = region;
+  item.innerHTML = `
+    <span class="swatch" style="background:${REGIONS[region].color}"></span>
+    <span class="region-name">${region}</span>
+    <span class="region-count">${count}</span>
+  `;
+  item.addEventListener('click', () => {
+    if (activeRegions.has(region)) {
+      activeRegions.delete(region);
+      item.classList.remove('active');
+      item.classList.add('inactive');
+    } else {
+      activeRegions.add(region);
+      item.classList.add('active');
+      item.classList.remove('inactive');
+    }
+    refreshMap();
+  });
+  regionList.appendChild(item);
+});
+
+document.getElementById('btn-all').addEventListener('click', () => {
+  Object.keys(REGIONS).forEach(r => activeRegions.add(r));
+  document.querySelectorAll('.region-item').forEach(el => { el.classList.add('active'); el.classList.remove('inactive'); });
+  refreshMap();
+});
+document.getElementById('btn-none').addEventListener('click', () => {
+  activeRegions.clear();
+  document.querySelectorAll('.region-item').forEach(el => { el.classList.remove('active'); el.classList.add('inactive'); });
+  refreshMap();
+});
+
+document.getElementById('stat-total').textContent = SITES.length;
+refreshMap();
+</script>
+</body>
+</html>
