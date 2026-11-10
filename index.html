@@ -180,7 +180,7 @@
       </div>
     </div>
     <footer>
-      Compiled from open-source reporting and Google Places data. Not an official DoD source &mdash; site counts and status are illustrative, not exhaustive. Map tiles load from CARTO/OSM and require an internet connection; site data itself is embedded in this file.
+      Compiled from open-source reporting and Google Places data. Not an official DoD source &mdash; site counts and status are illustrative, not exhaustive. Map tiles load from Esri and require an internet connection; site data itself is embedded in this file.
     </footer>
   </div>
   <div id="map"></div>
@@ -298,10 +298,12 @@ const SITES = [
 const map = L.map('map', { worldCopyJump:true, zoomControl:false }).setView([20, 15], 2.3);
 L.control.zoom({ position:'bottomright' }).addTo(map);
 
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-  maxZoom: 18,
-  subdomains: 'abcd'
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
+  maxZoom: 16
+}).addTo(map);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 16
 }).addTo(map);
 
 const activeRegions = new Set(Object.keys(REGIONS));
